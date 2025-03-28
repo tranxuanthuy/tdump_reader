@@ -1,0 +1,11 @@
+# pycache
+units/__pycache__/*
+# data
+data/
+output_06012014_12312015/
+combined_gdf.csv
+combined_gdf.xlsx
+
+# notebook
+*.ipynb
+
