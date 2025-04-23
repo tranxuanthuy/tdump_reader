@@ -27,8 +27,16 @@ def read_data_from_file_like(file_like, columns_name=None):
     if start_index == -1:
         print("Error: 'PRESSURE AIR_TEMP RAINFALL RELHUMID' line not found.")
         return None
+    
+    # delete line contain error value
+    correct_lines = []
+    for line in data_lines[start_index:]:
+        if '\x00' in line:
+            continue
+        else:
+            correct_lines.append(line)
 
-    data_to_parse = "".join(data_lines[start_index:])
+    data_to_parse = "".join(correct_lines)
 
     # Use io.StringIO to treat the string as a file
     data_io = io.StringIO(data_to_parse)
@@ -42,7 +50,7 @@ def read_data_from_file_like(file_like, columns_name=None):
     
 def select_desired_columns(
         df,
-        desired_cols = ['height_code', 'datetime', 'n', 'e', 'height', 'pressure', 'air_temp', 'rainfall', 'relhumid']
+        desired_cols = ['height_code', 'datetime', 'time_step', 'n', 'e', 'height', 'pressure', 'air_temp', 'rainfall', 'relhumid']
         ):
     """Selects and reorders the desired columns."""
     

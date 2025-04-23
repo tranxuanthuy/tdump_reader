@@ -1,3 +1,7 @@
+import geopandas as gpd
+import pandas as pd
+import numpy as np
+from shapely.geometry import Point
 
 def create_datetime_column(df, year_col='year', month_col='month', day_col='day', hour_col='hour', year_prefix='20'):
     """
@@ -117,4 +121,42 @@ def split_geodataframe_by_height_code(gdf):
     gdf_2 = gdf_2.reset_index(drop=True)
     gdf_3 = gdf_3.reset_index(drop=True)
     return gdf_1, gdf_2, gdf_3
+
+def fill_and_interpolate_gdf(gdf, value_columns, n_station = 10.720, e_station=105.240, n_col='n', e_col='e', geometry_col='geometry'):
+    gdf = gdf.copy()
+
+    # Chuẩn hóa time_step từ 0 đến -240
+    full_time_steps = pd.DataFrame({'time_step': np.arange(0, -241, -1)})
+    
+    # Gộp với gdf để tìm dòng còn thiếu
+    gdf_merged = pd.merge(full_time_steps, gdf, on='time_step', how='left')
+
+    # Sắp xếp theo time_step tăng dần để nội suy
+    gdf_merged = gdf_merged.sort_values('time_step')
+    gdf_merged.loc[gdf_merged['time_step'] == 0, n_col] = n_station
+    gdf_merged.loc[gdf_merged['time_step'] == 0, e_col] = e_station  
+
+    # 1. Nội suy cột tọa độ n, e
+    for col in [n_col, e_col]:
+        gdf_merged[col] = gdf_merged[col].interpolate(method='linear', limit_direction='both')
+        gdf_merged[col] = gdf_merged[col].fillna(method='ffill').fillna(method='bfill')
+
+    # 2. Cập nhật lại geometry từ n và e
+    gdf_merged[geometry_col] = [Point(e, n) for e, n in zip(gdf_merged[e_col], gdf_merged[n_col])]
+
+    # 3. Với các cột số liệu khác → điền giá trị trung bình
+    for col in value_columns:
+        mean_val = gdf[col].mean(skipna=True)
+        gdf_merged[col] = gdf_merged[col].fillna(mean_val)
+
+    # 4. Với các cột cố định như height_code, datetime → điền gần nhất
+    if 'datetime' in gdf_merged.columns:
+        gdf_merged['datetime'] = gdf_merged['datetime'].fillna(method='ffill').fillna(method='bfill')
+
+    if 'height_code' in gdf.columns:
+        gdf_merged['height_code'] = gdf['height_code'].iloc[0]
+    gdf_merged = gdf_merged.sort_values('time_step', ascending=False).reset_index(drop=True)
+    # 5. Trả về GeoDataFrame
+    return gpd.GeoDataFrame(gdf_merged, geometry=geometry_col)
+
     
